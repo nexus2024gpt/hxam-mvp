@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HX-AM MVP v2.5 — Hybrid-X Anomaly Miner</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            padding: 30px 0;
+            margin-bottom: 30px;
+            border-radius: 12px;
+        }
+        
+        header h1 { font-size: 2.5rem; text-align: center; margin-bottom: 10px; }
+        header p { text-align: center; opacity: 0.9; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+        
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .card h2 { font-size: 1.5rem; margin-bottom: 20px; color: var(--primary); }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+        
+        textarea { min-height: 120px; resize: vertical; }
+        
+        button {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
+        
+        .metric {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .metric-value { font-size: 2rem; font-weight: 700; color: var(--primary); }
+        .metric-label { font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .status-queued { background: var(--warning); color: #000; }
+        .status-processing { background: var(--primary); color: white; }
+        .status-completed { background: var(--success); color: white; }
+        .status-failed { background: var(--danger); color: white; }
+        
+        .artifact-list { max-height: 400px; overflow-y: auto; }
+        
+        .artifact-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .artifact-item:hover { background: rgba(255,255,255,0.1); }
+        
+        .artifact-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .artifact-title { font-weight: 600; }
+        
+        .output-box {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9rem;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .log-entry { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .log-time { color: var(--text-muted); font-size: 0.85rem; }
+        
+        .server-status { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--success); }
+        .status-dot.offline { background: var(--danger); }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            border-radius: 8px;
+            color: var(--text);
+            cursor: pointer;
+        }
+        .tab.active { background: var(--primary); }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔮 HX-AM MVP v2.5</h1>
+            <p>Hybrid-X Anomaly Miner — генерация инсайтов через детекцию аномалий</p>
+        </header>
+        
+        <div class="server-status">
+            <div class="status-dot" id="serverDot"></div>
+            <span id="serverStatus">Проверка подключения...</span>
+            <span id="serverVersion" style="margin-left: auto; color: var(--text-muted);"></span>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('ingest')">📥 Ingest</button>
+            <button class="tab" onclick="switchTab('artifacts')">📦 Артефакты</button>
+            <button class="tab" onclick="switchTab('websocket')">⚡ WebSocket</button>
+            <button class="tab" onclick="switchTab('logs')">📋 Логи</button>
+        </div>
+        
+        <!-- TAB: INGEST -->
+        <div id="tab-ingest" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h2>📝 Новый запрос</h2>
+                    <div class="form-group">
+                        <label>Текст запроса</label>
+                        <textarea id="queryText" placeholder="Например: Почему квантовая запутанность может быть связана с сознанием?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Домен</label>
+                        <select id="queryDomain">
+                            <option value="general">Общий</option>
+                            <option value="physics">Физика</option>
+                            <option value="biology">Биология</option>
+                            <option value="ontology">Онтология</option>
+                            <option value="mathematics">Математика</option>
+                            <option value="philosophy">Философия</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>X-Coordinate (0-1000)</label>
+                        <input type="number" id="queryX" value="500" min="0" max="1000">
+                    </div>
+                    <button id="submitBtn" onclick="submitQuery()">🚀 Отправить</button>
+                    
+                    <div class="metrics" id="metricsBox" style="display: none;">
+                        <div class="metric">
+                            <div class="metric-value" id="metricCoherence">-</div>
+                            <div class="metric-label">Когерентность</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" id="metricNovelty">-</div>
+                            <div class="metric-label">Новизна</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value" id="metricBSync">-</div>
+                            <div class="metric-label">B-Sync</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>📊 Результат</h2>
+                    <div id="resultBox" class="output-box">Ожидание запроса...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB: ARTIFACTS -->
+        <div id="tab-artifacts" class="tab-content hidden">
+            <div class="card">
+                <h2>📦 Артефакты (.hyx)</h2>
+                <button onclick="loadArtifacts()" style="margin-bottom: 20px; width: auto;">🔄 Обновить</button>
+                <div id="artifactList" class="artifact-list">
+                    <p style="color: var(--text-muted);">Загрузка...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB: WEBSOCKET -->
+        <div id="tab-websocket" class="tab-content hidden">
+            <div class="grid">
+                <div class="card">
+                    <h2>⚡ WebSocket Тест</h2>
+                    <div class="form-group">
+                        <label>Быстрый запрос</label>
+                        <input type="text" id="wsQuery" placeholder="Введите запрос...">
+                    </div>
+                    <button onclick="wsSend()">📤 Отправить</button>
+                    <div style="margin-top: 20px;">
+                        <span class="status-badge" id="wsStatus">Отключено</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>📥 Ответы</h2>
+                    <div id="wsOutput" class="output-box">Ожидание подключения...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB: LOGS -->
+        <div id="tab-logs" class="tab-content hidden">
+            <div class="card">
+                <h2>📋 Системные логи</h2>
+                <div id="logBox" class="output-box">Логи загружаются...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ==================== GLOBAL STATE ====================
+        let ws = null;
+        let currentJobId = null;
+        let logs = [];
+        
+        // ==================== TAB SWITCHING ====================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            event.target.classList.add('active');
+            
+            if (tabName === 'artifacts') loadArtifacts();
+            if (tabName === 'logs') renderLogs();
+        }
+        
+        // ==================== SERVER STATUS ====================
+        async function checkServerStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                document.getElementById('serverDot').classList.remove('offline');
+                document.getElementById('serverStatus').textContent = 'Подключено';
+                document.getElementById('serverVersion').textContent = `${data.server} | Узлов: ${data.anchor_ontology_nodes}`;
+            } catch (e) {
+                document.getElementById('serverDot').classList.add('offline');
+                document.getElementById('serverStatus').textContent = 'Отключено';
+            }
+        }
+        
+        // ==================== SUBMIT QUERY ====================
+        async function submitQuery() {
+            const text = document.getElementById('queryText').value.trim();
+            const domain = document.getElementById('queryDomain').value;
+            const x_coord = parseInt(document.getElementById('queryX').value) || 500;
+            
+            if (!text) {
+                alert('Введите текст запроса');
+                return;
+            }
+            
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Обработка...';
+            
+            try {
+                const res = await fetch('/api/ingest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, domain, context: { x_coordinate: x_coord } })
+                });
+                
+                const data = await res.json();
+                currentJobId = data.job_id;
+                
+                addLog(`Запрос отправлен: ${data.job_id}`);
+                document.getElementById('resultBox').textContent = `Job ID: ${data.job_id}\nСтатус: ${data.status}\n\nОжидание обработки...`;
+                
+                // Polling статуса
+                pollJobStatus(data.job_id);
+                
+            } catch (e) {
+                document.getElementById('resultBox').textContent = `Ошибка: ${e.message}`;
+                addLog(`Ошибка отправки: ${e.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Отправить';
+            }
+        }
+        
+        // ==================== POLL JOB STATUS ====================
+        async function pollJobStatus(jobId) {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/status/${jobId}`);
+                    const data = await res.json();
+                    
+                    if (data.status === 'completed') {
+                        clearInterval(interval);
+                        displayResult(data.result);
+                        addLog(`Job завершён: ${jobId}`);
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        document.getElementById('resultBox').textContent = `Ошибка: ${data.error}`;
+                        addLog(`Job failed: ${jobId}`);
+                    } else {
+                        document.getElementById('resultBox').textContent = `Job ID: ${jobId}\nСтатус: ${data.status}`;
+                    }
+                } catch (e) {
+                    clearInterval(interval);
+                    document.getElementById('resultBox').textContent = `Ошибка polling: ${e.message}`;
+                }
+            }, 2000);
+        }
+        
+        // ==================== DISPLAY RESULT ====================
+        function displayResult(result) {
+            if (!result) return;
+            
+            const text = `Артефакт: ${result.artifact_id}
+B-Sync: ${result.b_sync?.toFixed(3) || 'N/A'}
+Изоморфизмов: ${result.isomorphs_found || 0}
+Аномалия: ${result.deviation_detected ? '✅ Да' : '❌ Нет'}
+`;
+            
+            document.getElementById('resultBox').textContent = text;
+            
+            // Метрики
+            document.getElementById('metricsBox').style.display = 'grid';
+            document.getElementById('metricCoherence').textContent = (result.b_sync || 0).toFixed(3);
+            document.getElementById('metricNovelty').textContent = ((1 - (result.b_sync || 0)) || 0).toFixed(3);
+            document.getElementById('metricBSync').textContent = (result.b_sync || 0).toFixed(3);
+        }
+        
+        // ==================== LOAD ARTIFACTS ====================
+        async function loadArtifacts() {
+            try {
+                const res = await fetch('/api/artifacts');
+                const data = await res.json();
+                
+                const list = document.getElementById('artifactList');
+                if (data.artifacts.length === 0) {
+                    list.innerHTML = '<p style="color: var(--text-muted);">Артефактов пока нет</p>';
+                    return;
+                }
+                
+                list.innerHTML = data.artifacts.map(a => `
+                    <div class="artifact-item">
+                        <div class="artifact-header">
+                            <span class="artifact-title">${a.id}</span>
+                            <span class="status-badge status-${a.status}">${a.status}</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--text-muted);">
+                            ${a.title}...<br/>
+                            Домен: ${a.domain} | B-Sync: ${a.b_sync?.toFixed(3) || 'N/A'}<br/>
+                            ${new Date(a.created_at).toLocaleString()}
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (e) {
+                document.getElementById('artifactList').innerHTML = `<p style="color: var(--danger);">Ошибка: ${e.message}</p>`;
+            }
+        }
+        
+        // ==================== WEBSOCKET ====================
+        function wsConnect() {
+            if (ws && ws.readyState === WebSocket.OPEN) return;
+            
+            ws = new WebSocket(`ws://${location.host}/ws/query`);
+            
+            ws.onopen = () => {
+                document.getElementById('wsStatus').textContent = 'Подключено';
+                document.getElementById('wsStatus').className = 'status-badge status-completed';
+                addLog('WebSocket подключён');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const output = document.getElementById('wsOutput');
+                output.textContent += `\n[${new Date().toLocaleTimeString()}] ${JSON.stringify(data, null, 2)}`;
+                output.scrollTop = output.scrollHeight;
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('wsStatus').textContent = 'Отключено';
+                document.getElementById('wsStatus').className = 'status-badge status-failed';
+                addLog('WebSocket отключён');
+            };
+            
+            ws.onerror = (e) => {
+                addLog(`WebSocket ошибка: ${e.type}`);
+            };
+        }
+        
+        function wsSend() {
+            const query = document.getElementById('wsQuery').value.trim();
+            if (!query) return;
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                wsConnect();
+                setTimeout(() => wsSend(), 500);
+                return;
+            }
+            
+            ws.send(JSON.stringify({ query }));
+            addLog(`WS отправлено: ${query}`);
+            document.getElementById('wsQuery').value = '';
+        }
+        
+        // ==================== LOGS ====================
+        function addLog(message) {
+            logs.unshift({ time: new Date().toLocaleTimeString(), message });
+            if (logs.length > 100) logs.pop();
+        }
+        
+        function renderLogs() {
+            const box = document.getElementById('logBox');
+            box.innerHTML = logs.map(log => `
+                <div class="log-entry">
+                    <span class="log-time">[${log.time}]</span> ${log.message}
+                </div>
+            `).join('');
+        }
+        
+        // ==================== INIT ====================
+        window.addEventListener('load', () => {
+            checkServerStatus();
+            setInterval(checkServerStatus, 30000);
+            wsConnect();
+            addLog('Интерфейс загружен');
+        });
+    </script>
+</body>
+</html>

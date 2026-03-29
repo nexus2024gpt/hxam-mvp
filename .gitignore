@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Проект
+artifacts/*.json
+anchor_ontology/embeddings/*
+tools/logs/*.log
+*.hyx-artifact.json
+
+# Secrets
+.env
+*.key
+*.pem
+
+# Backup files
+*.backup
+*.txt

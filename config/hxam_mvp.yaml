@@ -1,0 +1,41 @@
+hxam:
+  version: "2.5-mvp"
+  
+  # Пороги
+  deviation_threshold: 0.3
+  isomorph_min_count: 2
+  b_sync_threshold: 0.5
+  
+  # Производительность
+  max_isomorph_candidates: 50
+  use_sparse_matrices: true
+  dream_state_enabled: true
+  
+  # AI Gateway
+  ai:
+    primary_model: "gpt-4o"
+    fallback_models:
+      - "claude-3-sonnet"
+      - "gpt-3.5-turbo"
+    timeout_seconds: 30
+    retry_attempts: 3
+  
+  # Dream State (Celery)
+  celery:
+    broker_url: "redis://localhost:6379/0"
+    result_backend: "redis://localhost:6379/0"
+  
+  # Веб
+  web:
+    host: "0.0.0.0"
+    port: 8000
+    debug: true
+  
+  # Anchor Ontology
+  anchor:
+    min_nodes: 1000
+    embedding_model: "all-MiniLM-L6-v2"
+  
+  # Безопасность
+  human_override_required: true
+  human_override_threshold: 0.7
