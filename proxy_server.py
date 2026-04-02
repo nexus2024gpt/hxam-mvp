@@ -284,7 +284,8 @@ async def api_query(request: QueryRequest):
                 chat_history.log_query(
                     query={"text": request.text, "domain": request.domain},
                     response=fallback_response,
-                    response_time_ms=(time.time() - start_time) * 1000
+                    response_time_ms=(time.time() - start_time) * 1000,
+                    artifact_filename=None
                 )
             return QueryResponse(
                 job_id=job_id,
@@ -302,7 +303,8 @@ async def api_query(request: QueryRequest):
             chat_history.log_query(
                 query={"text": request.text, "domain": request.domain},
                 response=result,
-                response_time_ms=(time.time() - start_time) * 1000
+                response_time_ms=(time.time() - start_time) * 1000,
+                artifact_filename=artifact_path.split("\\")[-1] if artifact_path else None
             )
         
         return QueryResponse(
@@ -319,7 +321,8 @@ async def api_query(request: QueryRequest):
             chat_history.log_query(
                 query={"text": request.text, "domain": request.domain},
                 response={"error": str(e), "detected_domain": "error", "metrics": {"b_sync": 0.0}},
-                response_time_ms=(time.time() - start_time) * 1000
+                response_time_ms=(time.time() - start_time) * 1000,
+                artifact_filename=None
             )
         return QueryResponse(
             job_id=job_id,
@@ -383,6 +386,23 @@ async def get_history(limit: int = 20):
 # ЗАПУСК
 # ═══════════════════════════════════════════════════════════════════════════
 
+
+@app.get("/api/artifact/{filename}")
+async def get_artifact(filename: str):
+    """Получить содержимое артефакта по имени файла"""
+    import json
+    from pathlib import Path
+    artifact_path = Path("artifacts") / filename
+    if not artifact_path.exists():
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    try:
+        with open(artifact_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     print("\n" + "="*60)
@@ -390,6 +410,8 @@ if __name__ == "__main__":
     print("  http://localhost:8000")
     print("="*60 + "\n")
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
 
 
 

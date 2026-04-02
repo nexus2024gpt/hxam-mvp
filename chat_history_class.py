@@ -19,8 +19,8 @@ class ChatHistoryManager:
     def _generate_session_id(self) -> str:
         """Генерация уникального ID сессии"""
         return f"sess_{hashlib.md5(f'{time.time()}'.encode()).hexdigest()[:8]}"
-    
-    def log_query(self, query: Dict[str, Any], response: Dict[str, Any], response_time_ms: float):
+
+    def log_query(self, query: Dict[str, Any], response: Dict[str, Any], response_time_ms: float, artifact_filename: Optional[str] = None):
         """Логирование запроса-ответа (сохраняет сразу в файл)"""
         entry = {
             "session_id": self.session_id,
@@ -31,6 +31,7 @@ class ChatHistoryManager:
             "status_type": response.get("status", {}).get("type", "unknown"),
             "b_sync": response.get("metrics", {}).get("b_sync", 0.0),
             "artifact_saved": response.get("save_artifact", False),
+            "artifact_filename": artifact_filename,
             "response_time_ms": round(response_time_ms, 2),
             "error": response.get("error")
         }
@@ -95,7 +96,7 @@ class ChatHistoryManager:
             "domain_distribution": domain_dist,
             "unique_sessions": len(set(e.get("session_id") for e in all_entries))
         }
-    
+
     def get_history(self, limit: int = 20) -> List[Dict[str, Any]]:
         """Получение последних записей истории"""
         all_entries: List[Dict[str, Any]] = []

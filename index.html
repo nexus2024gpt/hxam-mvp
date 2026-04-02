@@ -165,6 +165,42 @@
             font-family: inherit;
         }
         .refresh-btn:hover { background: #64748b; }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+        }
+        .modal-content {
+            background-color: #1e293b;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #6366f1;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 900px;
+            max-height: 80%;
+            overflow-y: auto;
+            color: #e2e8f0;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover { color: #fff; }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -211,6 +247,14 @@
             <div id="stats-content">
                 <p style="color: #94a3b8; text-align: center; padding: 2rem;">Загрузка статистики...</p>
             </div>
+        </div>
+    </div>
+
+    <div id="artifactModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Артефакт</h2>
+            <pre id="artifactContent">Загрузка...</pre>
         </div>
     </div>
 
@@ -303,8 +347,9 @@
                     const date = new Date(item.timestamp).toLocaleString('ru-RU');
                     const bSync = (item.b_sync || 0).toFixed(2);
                     const hasArtifact = item.artifact_saved ? '<span class="history-artifact">✅</span>' : '';
+                    const artifactAttr = item.artifact_filename ? ` data-artifact="${item.artifact_filename}"` : '';
                     
-                    html += '<div class="history-item">';
+                    html += `<div class="history-item"${artifactAttr}>`;
                     html += `<div class="history-timestamp">🕐 ${date}</div>`;
                     html += `<div class="history-query">${item.query_text.substring(0, 150)}${item.query_text.length > 150 ? '...' : ''}</div>`;
                     html += '<div class="history-meta">';
@@ -317,10 +362,44 @@
                 });
                 
                 historyList.innerHTML = html;
+                document.querySelectorAll('.history-item').forEach(el => {
+                    const artifactFile = el.getAttribute('data-artifact');
+                    if (artifactFile) {
+                        el.style.cursor = 'pointer';
+                        el.addEventListener('click', () => openArtifact(artifactFile));
+                    }
+                });
             } catch (error) {
                 historyList.innerHTML = `<div class="error">❌ Ошибка загрузки: ${error.message}</div>`;
             }
         }
+
+        async function openArtifact(filename) {
+            const modal = document.getElementById('artifactModal');
+            const contentDiv = document.getElementById('artifactContent');
+            contentDiv.textContent = 'Loading...';
+            modal.style.display = 'block';
+            try {
+                const response = await fetch('/api/artifact/' + encodeURIComponent(filename));
+                if (!response.ok) throw new Error('Not found');
+                const data = await response.json();
+                contentDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                contentDiv.textContent = 'Error loading artifact: ' + error.message;
+            }
+        }
+
+        const closeButton = document.querySelector('.close');
+        if (closeButton) {
+            closeButton.onclick = function() {
+                document.getElementById('artifactModal').style.display = 'none';
+            };
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('artifactModal');
+            if (event.target == modal) modal.style.display = 'none';
+        };
         
         // Load Statistics
         async function loadStatistics() {
