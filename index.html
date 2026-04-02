@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HX-AM Proxy v3.4</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #6366f1; margin-bottom: 0.5rem; font-size: 2rem; }
+        .subtitle { color: #94a3b8; margin-bottom: 2rem; font-size: 0.9rem; }
+        
+        /* Tabs */
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; border-bottom: 2px solid #334155; }
+        .tab-button {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            font-family: inherit;
+            font-weight: 600;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-button:hover { color: #e2e8f0; }
+        .tab-button.active {
+            color: #6366f1;
+            border-bottom-color: #6366f1;
+        }
+        
+        /* Tab Content */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Query Form */
+        textarea {
+            width: 100%;
+            height: 150px;
+            background: #1e293b;
+            border: 2px solid #475569;
+            color: #fff;
+            padding: 1rem;
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: vertical;
+            border-radius: 8px;
+            transition: border-color 0.3s;
+        }
+        textarea:focus { outline: none; border-color: #6366f1; }
+        .submit-btn {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #fff;
+            border: none;
+            padding: 0.75rem 2rem;
+            cursor: pointer;
+            margin: 1rem 0;
+            font-size: 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4); }
+        .submit-btn:disabled { background: #64748b; cursor: not-allowed; transform: none; }
+        
+        /* Result */
+        .result {
+            background: #1e293b;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-top: 1.5rem;
+            border-left: 4px solid #6366f1;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .result h3 { color: #6366f1; margin-bottom: 1rem; }
+        .response-text { white-space: pre-wrap; line-height: 1.6; margin-bottom: 1rem; }
+        .metrics { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+        .metric {
+            background: #334155;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+        .metric-label { color: #94a3b8; margin-right: 0.5rem; }
+        .metric-value { color: #4ade80; font-weight: bold; }
+        .artifact-saved {
+            color: #4ade80;
+            font-weight: bold;
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: rgba(74, 222, 128, 0.1);
+            border-radius: 6px;
+        }
+        .error {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid #ef4444;
+        }
+        .loading {
+            display: none;
+            color: #6366f1;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 8px;
+        }
+        .loading.active { display: block; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        /* History List */
+        .history-list { max-height: 600px; overflow-y: auto; }
+        .history-item {
+            background: #1e293b;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            border-left: 3px solid #475569;
+            transition: border-left-color 0.3s;
+        }
+        .history-item:hover { border-left-color: #6366f1; }
+        .history-timestamp { color: #94a3b8; font-size: 0.8rem; margin-bottom: 0.5rem; }
+        .history-query { font-weight: 600; margin-bottom: 0.5rem; color: #e2e8f0; }
+        .history-meta { display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem; }
+        .history-bSync { color: #4ade80; }
+        .history-domain { color: #60a5fa; }
+        .history-artifact { color: #fbbf24; }
+        
+        /* Stats Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .stat-value { font-size: 2.5rem; font-weight: bold; color: #6366f1; margin-bottom: 0.5rem; }
+        .stat-label { color: #94a3b8; font-size: 0.9rem; }
+        .stats-section { background: #1e293b; padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; }
+        .stats-section h3 { color: #6366f1; margin-bottom: 1rem; }
+        .stat-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #334155; }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-name { color: #94a3b8; }
+        .stat-number { color: #4ade80; font-weight: bold; }
+        
+        .refresh-btn {
+            background: #475569;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-family: inherit;
+        }
+        .refresh-btn:hover { background: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔮 HX-AM Proxy v3.4</h1>
+        <p class="subtitle">Тонкий AI-прокси для детекции онтологических аномалий</p>
+        
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('query')">💬 Запрос</button>
+            <button class="tab-button" onclick="switchTab('history')">📜 История</button>
+            <button class="tab-button" onclick="switchTab('stats')">📊 Статистика</button>
+        </div>
+        
+        <!-- Query Tab -->
+        <div id="query-tab" class="tab-content active">
+            <form id="queryForm">
+                <textarea 
+                    id="queryText" 
+                    placeholder="Введите ваш запрос...&#10;Например: Какой изоморф наблюдается между топологией солнечной системы и атомами?"
+                    required
+                ></textarea>
+                <button type="submit" class="submit-btn" id="submitBtn">🚀 Отправить</button>
+            </form>
+            
+            <div id="loading" class="loading">
+                ⏳ Обработка запроса... (обычно 3-5 секунд)
+            </div>
+            
+            <div id="result"></div>
+        </div>
+        
+        <!-- History Tab -->
+        <div id="history-tab" class="tab-content">
+            <button class="refresh-btn" onclick="loadHistory()">🔄 Обновить</button>
+            <div id="history-list" class="history-list">
+                <p style="color: #94a3b8; text-align: center; padding: 2rem;">Загрузка истории...</p>
+            </div>
+        </div>
+        
+        <!-- Stats Tab -->
+        <div id="stats-tab" class="tab-content">
+            <button class="refresh-btn" onclick="loadStatistics()">🔄 Обновить</button>
+            <div id="stats-content">
+                <p style="color: #94a3b8; text-align: center; padding: 2rem;">Загрузка статистики...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab Switching
+        function switchTab(tabName) {
+            // Update buttons
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Load data if needed
+            if (tabName === 'history') loadHistory();
+            if (tabName === 'stats') loadStatistics();
+        }
+        
+        // Query Form Submission
+        document.getElementById('queryForm').onsubmit = async (e) => {
+            e.preventDefault();
+            
+            const queryText = document.getElementById('queryText').value.trim();
+            if (!queryText) return;
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const resultDiv = document.getElementById('result');
+            
+            submitBtn.disabled = true;
+            loading.classList.add('active');
+            resultDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: queryText, domain: 'auto', x_coordinate: 500})
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="error">❌ Ошибка: ${data.error}</div>`;
+                } else if (data.result) {
+                    const r = data.result;
+                    let html = '<div class="result">';
+                    html += '<h3>📊 Ответ:</h3>';
+                    html += `<div class="response-text">${r.response_text}</div>`;
+                    
+                    html += '<div class="metrics">';
+                    html += `<div class="metric"><span class="metric-label">B_sync:</span><span class="metric-value">${(r.metrics.b_sync || 0).toFixed(2)}</span></div>`;
+                    html += `<div class="metric"><span class="metric-label">Новизна:</span><span class="metric-value">${r.metrics.novelty || 'N/A'}</span></div>`;
+                    html += `<div class="metric"><span class="metric-label">Потенциал:</span><span class="metric-value">${r.metrics.potential || 'N/A'}</span></div>`;
+                    html += `<div class="metric"><span class="metric-label">Домен:</span><span class="metric-value">${r.detected_domain || 'N/A'}</span></div>`;
+                    html += `<div class="metric"><span class="metric-label">X:</span><span class="metric-value">${r.detected_x_coordinate || 500}</span></div>`;
+                    html += '</div>';
+                    
+                    if (data.artifact_saved) {
+                        html += `<div class="artifact-saved">✅ Артефакт сохранён: ${data.artifact_saved}</div>`;
+                    }
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Ошибка соединения: ${error.message}</div>`;
+            } finally {
+                submitBtn.disabled = false;
+                loading.classList.remove('active');
+            }
+        };
+        
+        // Load History
+        async function loadHistory() {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 2rem;">Загрузка истории...</p>';
+            
+            try {
+                const response = await fetch('/api/history?limit=50');
+                const data = await response.json();
+                
+                if (!data.history || data.history.length === 0) {
+                    historyList.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 2rem;">📭 История пуста</p>';
+                    return;
+                }
+                
+                let html = '';
+                data.history.forEach(item => {
+                    const date = new Date(item.timestamp).toLocaleString('ru-RU');
+                    const bSync = (item.b_sync || 0).toFixed(2);
+                    const hasArtifact = item.artifact_saved ? '<span class="history-artifact">✅</span>' : '';
+                    
+                    html += '<div class="history-item">';
+                    html += `<div class="history-timestamp">🕐 ${date}</div>`;
+                    html += `<div class="history-query">${item.query_text.substring(0, 150)}${item.query_text.length > 150 ? '...' : ''}</div>`;
+                    html += '<div class="history-meta">';
+                    html += `<span class="history-bSync">B_sync: ${bSync}</span>`;
+                    html += `<span class="history-domain">| ${item.detected_domain || 'unknown'}</span>`;
+                    html += `<span>| X: ${item.detected_x_coordinate || 500}</span>`;
+                    html += hasArtifact;
+                    if (item.error) html += `<span style="color: #ef4444">| ⚠️ Ошибка</span>`;
+                    html += '</div></div>';
+                });
+                
+                historyList.innerHTML = html;
+            } catch (error) {
+                historyList.innerHTML = `<div class="error">❌ Ошибка загрузки: ${error.message}</div>`;
+            }
+        }
+        
+        // Load Statistics
+        async function loadStatistics() {
+            const statsContent = document.getElementById('stats-content');
+            statsContent.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 2rem;">Загрузка статистики...</p>';
+            
+            try {
+                const response = await fetch('/api/statistics');
+                const stats = await response.json();
+                
+                if (stats.total_queries === 0) {
+                    statsContent.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 2rem;">📊 Нет данных для статистики</p>';
+                    return;
+                }
+                
+                let html = '<div class="stats-grid">';
+                html += `<div class="stat-card"><div class="stat-value">${stats.total_queries}</div><div class="stat-label">Всего запросов</div></div>`;
+                html += `<div class="stat-card"><div class="stat-value">${stats.artifacts_saved}</div><div class="stat-label">Сохранено артефактов</div></div>`;
+                html += `<div class="stat-card"><div class="stat-value">${(stats.avg_b_sync || 0).toFixed(2)}</div><div class="stat-label">Средний B_sync</div></div>`;
+                html += `<div class="stat-card"><div class="stat-value">${stats.unique_sessions || 1}</div><div class="stat-label">Уникальных сессий</div></div>`;
+                html += '</div>';
+                
+                if (stats.domain_distribution && Object.keys(stats.domain_distribution).length > 0) {
+                    html += '<div class="stats-section"><h3>📊 Распределение по доменам</h3>';
+                    for (const [domain, count] of Object.entries(stats.domain_distribution)) {
+                        const percentage = ((count / stats.total_queries) * 100).toFixed(1);
+                        html += `<div class="stat-row"><span class="stat-name">${domain}</span><span class="stat-number">${count} (${percentage}%)</span></div>`;
+                    }
+                    html += '</div>';
+                }
+                
+                if (stats.status_distribution && Object.keys(stats.status_distribution).length > 0) {
+                    html += '<div class="stats-section"><h3>📊 Распределение по типам</h3>';
+                    for (const [status, count] of Object.entries(stats.status_distribution)) {
+                        const percentage = ((count / stats.total_queries) * 100).toFixed(1);
+                        html += `<div class="stat-row"><span class="stat-name">${status}</span><span class="stat-number">${count} (${percentage}%)</span></div>`;
+                    }
+                    html += '</div>';
+                }
+                
+                html += '<div class="stats-section">';
+                html += `<h3>⚡ Производительность</h3>`;
+                html += `<div class="stat-row"><span class="stat-name">Среднее время ответа</span><span class="stat-number">${(stats.avg_response_time_ms || 0).toFixed(0)} мс</span></div>`;
+                html += `<div class="stat-row"><span class="stat-name">Ошибок</span><span class="stat-number">${stats.errors || 0}</span></div>`;
+                html += '</div>';
+                
+                statsContent.innerHTML = html;
+            } catch (error) {
+                statsContent.innerHTML = `<div class="error">❌ Ошибка загрузки: ${error.message}</div>`;
+            }
+        }
+    
+    async function submitQuery(queryText) {
+        try {
+            const response = await fetch('/api/query', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: queryText, domain: 'auto', x_coordinate: 500})
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error:', error);
+            return {error: error.message};
+        }
+    }
+</script>
+</body>
+</html>

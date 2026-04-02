@@ -1,29 +1,23 @@
 # Python
 __pycache__/
-*.py[cod]
-*.so
-.Python
+*.pyc
 .venv/
-env/
-venv/
+.env
+
+# Project specific
+artifacts/
+chat_history/
+*.hyx.json
+*.jsonl
+
+# Backups
+*.bak
+*.backup
+*.CORRUPTED.backup
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Проект
-artifacts/*.json
-anchor_ontology/embeddings/*
-tools/logs/*.log
-*.hyx-artifact.json
-
-# Secrets
-.env
-*.key
-*.pem
-
-# Backup files
-*.backup
-*.txt
+# OS
+Thumbs.db
