@@ -15,8 +15,9 @@ from typing import Optional, Dict, Any
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from dotenv import load_dotenv
+from llm_client import GroqClient
 def extract_json_from_text(text: str) -> str:
     """Извлекает JSON из текста, удаляя преамбулы и посторонние символы."""
     import re
@@ -113,6 +114,13 @@ class QueryResponse(BaseModel):
     artifact_saved: Optional[str] = None
     error: Optional[str] = None
 
+class AIResponseModel(BaseModel):
+    status: str
+    analysis: Dict[str, Any]
+    metrics: Dict[str, Any]
+    response_text: str
+    save_artifact: bool
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ЛОГИКА
 # ═══════════════════════════════════════════════════════════════════════════
@@ -142,72 +150,52 @@ def generate_artifact_path(job_id: str, content: Dict[str, Any]) -> str:
 
 async def process_query(request: QueryRequest, max_retries: int = 3) -> Dict[str, Any]:
     """Отправить запрос в AI с системным промтом"""
-    if not LITELLM_OK:
+    client = GroqClient()
+    if not client.available:
         return {"error": "LiteLLM not installed. Run: pip install litellm"}
-    
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        return {"error": "GROQ_API_KEY not set in .env"}
-    
+
     user_prompt = f"""Домен: {request.domain}
 Уровень масштаба (X): {request.x_coordinate}
 Запрос: {request.text}
 
 Проанализируй по принципам HX-AM и верни ТОЛЬКО JSON."""
-    
+
     for attempt in range(max_retries):
         try:
-            response = await acompletion(
-                model="groq/llama-3.3-70b-versatile",
+            content = await client.complete(
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}
-                ],
-                api_key=api_key,
-                temperature=0.4,
-                max_tokens=1500,
-                timeout=30
+                ]
             )
-            
-            content = response.choices[0].message.content.strip()
-            
-            # Извлечение JSON с помощью новой функции
+
             json_str = extract_json_from_text(content)
             if not json_str:
                 raise ValueError("No JSON found in response")
-            
-            # Попытка парсинга с очисткой
+
             try:
                 result = json.loads(json_str)
-            except json.JSONDecodeError as e:
-                # Последняя попытка: удалить непечатаемые символы и попробовать ещё раз
+            except json.JSONDecodeError:
+                import re
                 cleaned = re.sub(r'[\x00-\x1f\x7f]', '', json_str)
                 result = json.loads(cleaned)
-            
+
             required_fields = ["status", "analysis", "metrics", "response_text", "save_artifact"]
             for field in required_fields:
                 if field not in result:
                     raise ValueError(f"Missing required field: {field}")
-            
+
             b_sync = result.get("metrics", {}).get("b_sync", 0.0)
             if b_sync > 0.50 and not result.get("save_artifact"):
                 result["save_artifact"] = True
                 logger.info(f"Auto-corrected save_artifact to True (b_sync={b_sync:.2f})")
-            
+
             return result
-            
-        except json.JSONDecodeError as e:
-            logger.warning(f"JSON parse error (attempt {attempt+1}/{max_retries}): {e}")
-            if attempt == max_retries - 1:
-                return {"error": f"Invalid JSON from AI: {str(e)}"}
-            await asyncio.sleep(2 ** attempt)
-            
-                except Exception as e:
+        except Exception as e:
             logger.error(f"AI error (attempt {attempt+1}/{max_retries}): {e}")
-            # Специальная обработка rate limit
             error_str = str(e).lower()
             if "ratelimiterror" in error_str or "rate_limit" in error_str or "rate limit" in error_str:
-                wait_time = 20 * (attempt + 1)  # 20, 40, 60 секунд
+                wait_time = 20 * (attempt + 1)
                 logger.warning(f"Rate limit hit. Waiting {wait_time}s before retry...")
                 await asyncio.sleep(wait_time)
             elif attempt == max_retries - 1:
